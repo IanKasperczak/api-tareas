@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.database import engine
 from app import models
+from app.routers import tasks
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -9,6 +10,8 @@ app = FastAPI(
     description="API REST para gestión de tareas personales",
     version="1.0.0"
 )
+
+app.include_router(tasks.router)
 
 @app.get("/health")
 def health_check():
