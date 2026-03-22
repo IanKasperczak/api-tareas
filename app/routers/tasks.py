@@ -5,26 +5,27 @@ from typing import List
 from app.database import get_db
 from app import models
 from app.schemas import TaskCreate, TaskUpdate, TaskResponse
+from app.auth_utils import get_current_user
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 @router.get("/", response_model=List[TaskResponse])
-def get_tasks(db: Session = Depends(get_db)):
-    return db.query(models.Task).all()
+def get_tasks(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.Task).filter(models.Task.owner_id == current_user.id).all()
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
-def get_task(task_id: int, db: Session = Depends(get_db)):
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+def get_task(task_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.owner_id == current_user.id).first()
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
     return task
 
 
 @router.post("/", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
-def create_task(task: TaskCreate, db: Session = Depends(get_db)):
-    nueva_tarea = models.Task(**task.model_dump())
+def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    nueva_tarea = models.Task(**task.model_dump(), owner_id=current_user.id)
     db.add(nueva_tarea)
     db.commit()
     db.refresh(nueva_tarea)
@@ -32,8 +33,8 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
-def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db)):
-    tarea = db.query(models.Task).filter(models.Task.id == task_id).first()
+def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    tarea = db.query(models.Task).filter(models.Task.id == task_id, models.Task.owner_id == current_user.id).first()
     if not tarea:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
     for campo, valor in task.model_dump(exclude_unset=True).items():
@@ -44,8 +45,8 @@ def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db)):
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(task_id: int, db: Session = Depends(get_db)):
-    tarea = db.query(models.Task).filter(models.Task.id == task_id).first()
+def delete_task(task_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    tarea = db.query(models.Task).filter(models.Task.id == task_id, models.Task.owner_id == current_user.id).first()
     if not tarea:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
     db.delete(tarea)
